@@ -23,6 +23,21 @@ https://github.com/crifan/idaExportFunctionCode
 
 https://github.com/crifan/idaExportFunctionCode.git
 
+## Wiki
+
+Detailed documentation: https://github.com/crifan/idaExportFunctionCode/wiki
+
+* [项目概述](https://github.com/crifan/idaExportFunctionCode/wiki/项目概述)
+* [快速开始](https://github.com/crifan/idaExportFunctionCode/wiki/快速开始)
+* [配置详解](https://github.com/crifan/idaExportFunctionCode/wiki/配置详解)
+* [导出功能说明](https://github.com/crifan/idaExportFunctionCode/wiki/导出功能说明)
+  * [C代码导出(伪代码)](https://github.com/crifan/idaExportFunctionCode/wiki/C代码导出(伪代码))
+  * [汇编代码导出](https://github.com/crifan/idaExportFunctionCode/wiki/汇编代码导出)
+  * [二进制数据导出](https://github.com/crifan/idaExportFunctionCode/wiki/二进制数据导出)
+* [使用示例](https://github.com/crifan/idaExportFunctionCode/wiki/使用示例)
+* [故障排除](https://github.com/crifan/idaExportFunctionCode/wiki/故障排除)
+* [开发者指南](https://github.com/crifan/idaExportFunctionCode/wiki/开发者指南)
+
 ## Usage
 
 ### 1. Config
