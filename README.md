@@ -105,27 +105,42 @@ int __fastcall sub_A389(int a1, int a2)
 
 ### Export assembly (.asm)
 
-IDA-style format with segment:address prefix, CODE XREF, and loc labels:
+IDA-style format with 16-digit segment:address, CODE XREF, function prototype, and loc labels:
 
 ```asm
-.text:0000A389 ; =======================================================
-.text:0000A389 ; S U B R O U T I N E
-.text:0000A389 ; =======================================================
-.text:0000A389
-.text:0000A389 ; Attributes: bp-based frame
-.text:0000A389 ; var_10               = -0x10
-.text:0000A389
-.text:0000A389 sub_A389:                               ; CODE XREF: main+20^p
-.text:0000A389                 STP  X29, X30, [SP,#-0x10+var_10]!
-.text:0000A38D                 MOV  X29, SP
-.text:0000A391                 B.EQ loc_A3A0
+__TEXT:000000000000A389 ; =============== S U B R O U T I N E =======================================
+__TEXT:000000000000A389
+__TEXT:000000000000A389 ; Attributes: bp-based frame
+__TEXT:000000000000A389
+__TEXT:000000000000A389 ; __int64 sub_A389(__int64, __int64)
+__TEXT:000000000000A389 sub_A389                                 ; CODE XREF: main+20↑p
+__TEXT:000000000000A389
+__TEXT:000000000000A389 var_10               =-0x10
+__TEXT:000000000000A389 arg_0                = 0
+__TEXT:000000000000A389
+__TEXT:000000000000A389 ; __unwind {
+__TEXT:000000000000A389                 STP  X29, X30, [SP,#-0x10+var_10]!
+__TEXT:000000000000A38D                 MOV  X29, SP
+__TEXT:000000000000A391                 B.EQ loc_A3A0
 ...
-.text:0000A3A0
-.text:0000A3A0 loc_A3A0:                               ; CODE XREF: sub_A389+8^j
-.text:0000A3A0                 MOV  W0, #1
+__TEXT:000000000000A39C                 RET
+__TEXT:000000000000A3A0 ; ---------------------------------------------------------------------------
+__TEXT:000000000000A3A0
+__TEXT:000000000000A3A0 loc_A3A0                                 ; CODE XREF: sub_A389+8↑j
+__TEXT:000000000000A3A0                 MOV  W0, #1
 ...
-.text:0000A3C9 ; End of function sub_A389
+__TEXT:000000000000A3C9 ; } // starts at A389
+__TEXT:000000000000A3C9 ; End of function sub_A389
 ```
+
+Features:
+* 16-digit address format (`segment:0000000000XXXXXX`)
+* Function prototype comment (from IDA type info)
+* Variable definitions with formatted offsets
+* `; __unwind {` / `; }` block markers
+* Separator lines (`; ---...`) after control flow instructions (RET, B, BR, JMP)
+* Arrow indicators: `↑` (xref from lower address), `↓` (xref from higher address)
+* Suffix indicators: `p` (call/procedure), `j` (jump)
 
 ### Export binary (.bin)
 

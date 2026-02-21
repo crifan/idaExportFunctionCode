@@ -149,7 +149,7 @@ def getExternalXrefs(addr, curFuncStart, curFuncEnd):
       funcStart = fromFunc.start_ea
       funcNameStr = idaapi.get_func_name(funcStart) or ("sub_%X" % funcStart)
       offset = fromAddr - funcStart
-      arrow = "^" if fromAddr < addr else "v"
+      arrow = "↑" if fromAddr < addr else "↓"
       suffix = "p" if isCall else "j"
       result.append({
         "str": "%s+%X%s%s" % (funcNameStr, offset, arrow, suffix),
@@ -157,9 +157,12 @@ def getExternalXrefs(addr, curFuncStart, curFuncEnd):
         "isJump": isJump,
       })
     else:
-      arrow = "^" if fromAddr < addr else "v"
+      # no function - use segment:address format
+      segName = getSegmentName(fromAddr)
+      arrow = "↑" if fromAddr < addr else "↓"
+      suffix = "p" if isCall else "j"
       result.append({
-        "str": "%X%s" % (fromAddr, arrow),
+        "str": "%s:%016X%s%s" % (segName, fromAddr, arrow, suffix),
         "isCall": isCall,
         "isJump": isJump,
       })
@@ -234,6 +237,9 @@ def getFuncFrameInfo(ea):
     frame_id = idc.get_frame_id(ea)
     if frame_id is not None and frame_id != idc.BADADDR:
       frame_size = idc.get_struc_size(frame_id)
+      # frsize = size of local variables area
+      # saved registers start at offset frsize, so frame base is at frsize
+      frame_base_offset = func.frsize
       seen_names = set()
       offset = 0
       while offset < frame_size:
@@ -241,16 +247,22 @@ def getFuncFrameInfo(ea):
         if name and name not in seen_names:
           seen_names.add(name)
           if name.startswith("var_"):
-            # parse offset from var name: var_10 -> 0x10
+            # try parse hex offset from name: var_10 -> 0x10
             try:
               var_offset = int(name[4:], 16)
-              var_lines.append("; %-20s = -0x%X" % (name, var_offset))
+              var_lines.append("%-20s =%s" % (name, formatVarOffset(var_offset, True)))
             except ValueError:
-              pass
+              # handle saved register naming: var_s0, var_s1, etc.
+              # calculate offset relative to frame base
+              rel_offset = offset - frame_base_offset
+              if rel_offset >= 0:
+                var_lines.append("%-20s =%s" % (name, formatVarOffset(rel_offset, False)))
+              else:
+                var_lines.append("%-20s =%s" % (name, formatVarOffset(-rel_offset, True)))
           elif name.startswith("arg_"):
             try:
               arg_offset = int(name[4:], 16)
-              var_lines.append("; %-20s =  0x%X" % (name, arg_offset))
+              var_lines.append("%-20s =%s" % (name, formatVarOffset(arg_offset, False)))
             except ValueError:
               pass
         size = idc.get_member_size(frame_id, offset)
@@ -262,7 +274,25 @@ def getFuncFrameInfo(ea):
 
   return attr_str, var_lines
 
-def getSegmentName(addr):
+def formatVarOffset(val, isNegative):
+  """Format variable offset value - no 0x prefix for values < 0x10
+  
+  Args:
+    val: absolute offset value
+    isNegative: True if offset is negative
+  Returns:
+    str: formatted offset string
+  """
+  if val < 0x10:
+    if isNegative:
+      return "-%d" % val
+    else:
+      return " %d" % val
+  else:
+    if isNegative:
+      return "-0x%X" % val
+    else:
+      return " 0x%X" % val
   """Get segment name for an address
 
   Args:
@@ -312,13 +342,33 @@ def getFuncEntryXrefs(ea):
       funcStart = fromFunc.start_ea
       funcNameStr = idaapi.get_func_name(funcStart) or ("sub_%X" % funcStart)
       offset = fromAddr - funcStart
-      arrow = "^" if fromAddr < ea else "v"
+      arrow = "↑" if fromAddr < ea else "↓"
       result.append("%s+%X%sp" % (funcNameStr, offset, arrow))
     else:
-      arrow = "^" if fromAddr < ea else "v"
-      result.append("%X%sp" % (fromAddr, arrow))
+      # no function - use segment:address format
+      segName = getSegmentName(fromAddr)
+      arrow = "↑" if fromAddr < ea else "↓"
+      result.append("%s:%016X%sp" % (segName, fromAddr, arrow))
 
   return result
+
+def getFuncTypeStr(ea):
+  """Get function type/prototype string
+  
+  Args:
+    ea: function start address
+  Returns:
+    str: function type string like "__int64 sub_XXX(__int64, __int64, ...)" or None
+  """
+  try:
+    tinfo = idaapi.tinfo_t()
+    if idaapi.get_tinfo(tinfo, ea):
+      funcType = str(tinfo)
+      if funcType:
+        return funcType
+  except:
+    pass
+  return None
 
 def exportAssembly(ea, funcEndAddr, funcName):
   """Export function assembly code in IDA-style format
@@ -332,41 +382,69 @@ def exportAssembly(ea, funcEndAddr, funcName):
   """
   asmLines = []
   segName = getSegmentName(ea)
+  addrFmt = "%s:%016X" % (segName, ea)
 
-  # IDA-style header with segment:address prefix
-  asmLines.append("%s:%08X ; %s" % (segName, ea, "="*55))
-  asmLines.append("%s:%08X ; S U B R O U T I N E" % (segName, ea))
-  asmLines.append("%s:%08X ; %s" % (segName, ea, "="*55))
-  asmLines.append("%s:%08X" % (segName, ea))
+  # 1. header line
+  asmLines.append("%s ; =============== S U B R O U T I N E =======================================" % addrFmt)
+  asmLines.append(addrFmt)
 
-  # function attributes and frame info
+  # 2. Attributes (or extra blank line if no attributes)
   attr_str, var_lines = getFuncFrameInfo(ea)
   if attr_str:
-    asmLines.append("%s:%08X %s" % (segName, ea, attr_str))
-  for vl in var_lines:
-    asmLines.append("%s:%08X %s" % (segName, ea, vl))
-  if attr_str or var_lines:
-    asmLines.append("%s:%08X" % (segName, ea))
+    asmLines.append("%s %s" % (addrFmt, attr_str))
+    asmLines.append(addrFmt)
+  else:
+    # extra blank line when no attributes
+    asmLines.append(addrFmt)
 
-  # function name label with entry xrefs
+  # 3. function prototype with function name
+  funcTypeStr = getFuncTypeStr(ea)
+  if funcTypeStr:
+    # insert function name into prototype: __int64(__int64, ...) -> __int64 funcName(__int64, ...)
+    if '(' in funcTypeStr:
+      retType = funcTypeStr.split('(')[0].strip()
+      params = funcTypeStr.split('(')[1].rstrip(')')
+      asmLines.append("%s ; %s %s(%s)" % (addrFmt, retType, funcName, params))
+    else:
+      asmLines.append("%s ; %s" % (addrFmt, funcTypeStr))
+
+  # 4. function name label with CODE XREF
   entryXrefs = getFuncEntryXrefs(ea)
   if entryXrefs:
-    if len(entryXrefs) == 1:
-      asmLines.append("%s:%08X %s:                                       ; CODE XREF: %s" % (segName, ea, funcName, entryXrefs[0]))
-    else:
-      asmLines.append("%s:%08X %s:                                       ; CODE XREF: %s ..." % (segName, ea, funcName, entryXrefs[0]))
+    asmLines.append("%s %-40s ; CODE XREF: %s" % (addrFmt, funcName, entryXrefs[0]))
+    # additional xrefs on separate lines
+    for xref in entryXrefs[1:4]:  # show up to 3 more
+      asmLines.append("%s %s ; %s" % (addrFmt, " "*40, xref))
+    if len(entryXrefs) > 4:
+      asmLines.append("%s %s ; ..." % (addrFmt, " "*40))
   else:
-    asmLines.append("%s:%08X %s:" % (segName, ea, funcName))
+    asmLines.append("%s %s" % (addrFmt, funcName))
+  asmLines.append(addrFmt)
+
+  # 5. var definitions
+  for vl in var_lines:
+    asmLines.append("%s %s" % (addrFmt, vl))
+  if var_lines:
+    asmLines.append(addrFmt)
+
+  # 6. __unwind marker
+  asmLines.append("%s ; __unwind {" % addrFmt)
 
   # collect jump targets for loc_xxx labels
   jumpTargets = collectJumpTargets(ea, funcEndAddr)
 
   curAddr = ea
+  lastAddr = ea
+  prevMnemonic = ""  # track previous instruction mnemonic
   while curAddr < funcEndAddr:
-    addrPrefix = "%s:%08X" % (segName, curAddr)
+    lastAddr = curAddr
+    addrPrefix = "%s:%016X" % (segName, curAddr)
 
     # add loc_xxx label if this is a jump target (not function entry)
     if curAddr in jumpTargets and curAddr != ea:
+      # add separator line after control flow terminating instructions (RET, B, etc.)
+      if prevMnemonic.upper() in ("RET", "B", "BR", "BX", "JMP", "RETAB", "RETAA"):
+        asmLines.append("%s ; ---------------------------------------------------------------------------" % addrPrefix)
       asmLines.append(addrPrefix)
       locLabel = idc.get_name(curAddr) or ("loc_%X" % curAddr)
       # for loc labels, show internal jump xrefs
@@ -376,26 +454,27 @@ def exportAssembly(ea, funcEndAddr, funcName):
           fromAddr = xref.frm
           if ea <= fromAddr < funcEndAddr:
             offset = fromAddr - ea
-            arrow = "^" if fromAddr < curAddr else "v"
+            arrow = "↑" if fromAddr < curAddr else "↓"
             internalJumpXrefs.append("%s+%X%sj" % (funcName, offset, arrow))
 
       if internalJumpXrefs:
         if len(internalJumpXrefs) == 1:
-          asmLines.append("%s %s:                                       ; CODE XREF: %s" % (addrPrefix, locLabel, internalJumpXrefs[0]))
+          asmLines.append("%s %-40s ; CODE XREF: %s" % (addrPrefix, locLabel, internalJumpXrefs[0]))
         else:
-          asmLines.append("%s %s:                                       ; CODE XREF: %s ..." % (addrPrefix, locLabel, internalJumpXrefs[0]))
+          asmLines.append("%s %-40s ; CODE XREF: %s ..." % (addrPrefix, locLabel, internalJumpXrefs[0]))
       else:
-        asmLines.append("%s %s:" % (addrPrefix, locLabel))
+        asmLines.append("%s %s" % (addrPrefix, locLabel))
 
-    # get meaningful external xrefs for this instruction
-    xrefInfos = getExternalXrefs(curAddr, ea, funcEndAddr)
+    # get meaningful external xrefs for this instruction (skip first instruction - xrefs shown in header)
     xrefComment = ""
-    if xrefInfos:
-      xrefStrs = [x["str"] for x in xrefInfos]
-      if len(xrefStrs) == 1:
-        xrefComment = "; CODE XREF: %s" % xrefStrs[0]
-      else:
-        xrefComment = "; CODE XREF: %s ..." % xrefStrs[0]
+    if curAddr != ea:
+      xrefInfos = getExternalXrefs(curAddr, ea, funcEndAddr)
+      if xrefInfos:
+        xrefStrs = [x["str"] for x in xrefInfos]
+        if len(xrefStrs) == 1:
+          xrefComment = "; CODE XREF: %s" % xrefStrs[0]
+        else:
+          xrefComment = "; CODE XREF: %s ..." % xrefStrs[0]
 
     # get disassembly line
     disasmLine = idc.generate_disasm_line(curAddr, 0)
@@ -404,8 +483,29 @@ def exportAssembly(ea, funcEndAddr, funcName):
         asmLines.append("%s                 %-40s %s" % (addrPrefix, disasmLine, xrefComment))
       else:
         asmLines.append("%s                 %s" % (addrPrefix, disasmLine))
+      
+      # for call instructions, get callee's repeatable comment and add as continuation lines
+      mnemonic = idc.print_insn_mnem(curAddr) or ""
+      if mnemonic.upper() in ("BL", "BLR", "CALL", "BLX"):
+        # get call target address
+        callTarget = idc.get_operand_value(curAddr, 0)
+        if callTarget != idc.BADADDR:
+          # get repeatable comment of the called function
+          repeatCmt = idc.get_func_cmt(callTarget, 1)  # 1 = repeatable
+          if repeatCmt:
+            # split into lines - skip first line as it's already in disasm output
+            cmtLines = repeatCmt.split('\n')
+            for cmtLine in cmtLines[1:]:  # skip first line
+              # preserve empty lines as "; " only
+              if cmtLine.strip():
+                asmLines.append("%s                                         ; %s" % (addrPrefix, cmtLine))
+              else:
+                asmLines.append("%s                                         ;" % addrPrefix)
     else:
       asmLines.append("%s ; [Error] Could not disassemble" % addrPrefix)
+
+    # update previous mnemonic for next iteration
+    prevMnemonic = idc.print_insn_mnem(curAddr) or ""
 
     # move to next instruction
     nextAddr = idc.next_head(curAddr, funcEndAddr)
@@ -413,8 +513,9 @@ def exportAssembly(ea, funcEndAddr, funcName):
       break
     curAddr = nextAddr
 
-  # end marker
-  asmLines.append("%s:%08X ; End of function %s" % (segName, funcEndAddr, funcName))
+  # end marker at last instruction address
+  asmLines.append("%s:%016X ; } // starts at %X" % (segName, lastAddr, ea))
+  asmLines.append("%s:%016X ; End of function %s" % (segName, lastAddr, funcName))
 
   return "\n".join(asmLines)
 
