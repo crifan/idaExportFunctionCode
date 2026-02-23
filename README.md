@@ -1,6 +1,6 @@
 # idaExportFunctionCode
 
-* Update: `20260221`
+* Update: `20260223`
 
 ## Function
 
@@ -22,6 +22,10 @@ Supported export types:
 https://github.com/crifan/idaExportFunctionCode
 
 https://github.com/crifan/idaExportFunctionCode.git
+
+## Exported Effect
+
+![exported_c_asm_bin](./doc/img/exported_c_asm_bin.jpg)
 
 ## Wiki
 
