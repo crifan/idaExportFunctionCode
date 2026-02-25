@@ -1,7 +1,7 @@
 # Function: IDA Plugin, to export specified function(s) code to file
 #   supported export types: .c (pseudocode), .asm (assembly), .bin (binary)
 # Author: CrifanLi
-# Update: 20260221
+# Update: 20260225
 # Usage:
 #   IDA Pro -> File -> Script file ... -> Run this script: `idaExportFunctionCode.py`
 #   -> got exported files in `exportedFunctionCode` subfolder
@@ -23,7 +23,7 @@ from datetime import datetime
 # Config & Settings
 ################################################################################
 
-VERSION = "20260221"
+VERSION = "20260225"
 
 # config file path: same folder as this script
 configFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -293,6 +293,8 @@ def formatVarOffset(val, isNegative):
       return "-0x%X" % val
     else:
       return " 0x%X" % val
+
+def getSegmentName(addr):
   """Get segment name for an address
 
   Args:

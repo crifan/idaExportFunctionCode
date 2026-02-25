@@ -1,0 +1,24 @@
+{
+  "isOverwrite": true,
+  "outputSubFolderName": "exportedCode/function",
+  "defaultExportTypes": [".c", ".asm", ".bin"],
+  "functionList": [
+    {
+      "startAddress": "0xA389"
+    },
+    {
+      "funcName": "vmGetHandler_31BA0"
+    },
+    {
+      "startAddress": "0x31D38",
+      "endAddress": "0x31D40",
+      "exportTypes": [".asm", ".bin"]
+    },
+    {
+      "startAddress": "0xB000",
+      "endAddress": "0xB100",
+      "funcName": "myFunc",
+      "exportTypes": [".c"]
+    }
+  ]
+}

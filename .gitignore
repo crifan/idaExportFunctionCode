@@ -1,6 +1,13 @@
 .DS_Store
 
+.qoder/
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
+
+# User's private config (use config.example.json as template)
+config.json
+
+runIdaPluginInCmd.sh

@@ -1,6 +1,6 @@
 # idaExportFunctionCode
 
-* Update: `20260223`
+* Update: `20260225`
 
 ## Function
 
@@ -46,7 +46,7 @@ Detailed documentation: https://github.com/crifan/idaExportFunctionCode/wiki
 
 ### 1. Config
 
-Edit `config.json` (same folder as the script):
+Copy `config.example.json` to `config.json` (same folder as the script) and edit:
 
 ```json
 {
